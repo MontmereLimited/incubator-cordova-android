@@ -18,10 +18,15 @@
 */
 package org.apache.cordova;
 
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.util.TimeZone;
+import java.util.UUID;
 
-import org.apache.cordova.api.LOG;
 import org.apache.cordova.api.CordovaInterface;
+import org.apache.cordova.api.LOG;
 import org.apache.cordova.api.Plugin;
 import org.apache.cordova.api.PluginResult;
 import org.json.JSONArray;
@@ -41,6 +46,7 @@ public class Device extends Plugin {
     public static String cordovaVersion = "2.0.0";              // Cordova version
     public static String platform = "Android";                  // Device OS
     public static String uuid;                                  // Device UUID
+    private static final String INSTALLATION = "INSTALLATION"; // INSTALLATION
 
     BroadcastReceiver telephonyReceiver = null;
 
@@ -171,9 +177,53 @@ public class Device extends Plugin {
      * @return
      */
     public String getUuid() {
-        String uuid = Settings.Secure.getString(this.cordova.getActivity().getContentResolver(), android.provider.Settings.Secure.ANDROID_ID);
+        String uuid = id(cordova.getActivity());
         return uuid;
     }
+    
+    /**
+     * @param context
+     * @return
+     */
+    private synchronized static String id(Context context) {
+        if (uuid == null) {  
+            File installation = new File(context.getFilesDir(), INSTALLATION);
+            try {
+                if (!installation.exists())
+                    writeInstallationFile(installation);
+                uuid = readInstallationFile(installation);
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return uuid;
+    }
+    
+    /**
+     * 
+     * @param installation
+     * @return
+     * @throws IOException
+     */
+    private static String readInstallationFile(File installation) throws IOException {
+        RandomAccessFile f = new RandomAccessFile(installation, "r");
+        byte[] bytes = new byte[(int) f.length()];
+        f.readFully(bytes);
+        f.close();
+        return new String(bytes);
+    }
+
+    /**
+     * @param installation
+     * @throws IOException
+     */
+    private static void writeInstallationFile(File installation) throws IOException {
+        FileOutputStream out = new FileOutputStream(installation);
+        String id = UUID.randomUUID().toString();
+        out.write(id.getBytes());
+        out.close();
+    }
+    
 
     /**
      * Get the Cordova version.
